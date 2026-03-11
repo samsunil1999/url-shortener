@@ -22,6 +22,7 @@ type URLRepository interface {
 	GetByShortCode(ctx context.Context, code string) (*URL, error)
 	GetExpiredURLs(ctx context.Context) ([]string, error)
 	DeleteByShortCode(ctx context.Context, code string) error
+	UpdateShortCode(ctx context.Context, id int64, shortCode string) error
 }
 
 type urlRepository struct {
@@ -77,5 +78,10 @@ func (r *urlRepository) GetExpiredURLs(ctx context.Context) ([]string, error) {
 
 func (r *urlRepository) DeleteByShortCode(ctx context.Context, code string) error {
 	_, err := r.db.ExecContext(ctx, `DELETE FROM urls WHERE short_code = $1`, code)
+	return err
+}
+
+func (r *urlRepository) UpdateShortCode(ctx context.Context, id int64, shortCode string) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE urls SET short_code = $1 WHERE id = $2`, shortCode, id)
 	return err
 }

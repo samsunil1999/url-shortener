@@ -40,7 +40,8 @@ func main() {
 
 	// Wire up layers
 	repo := repository.NewURLRepository(db)
-	svc := service.NewURLService(repo, rdb, logger)
+	analyticRepo := repository.NewAnalyticsRepository(db)
+	svc := service.NewURLService(repo, analyticRepo, rdb, logger)
 	h := handler.NewHandler(svc, logger)
 
 	// Start expiration worker
