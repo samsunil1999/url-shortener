@@ -8,4 +8,3 @@ CREATE TABLE urls (
 );
 
 CREATE INDEX idx_short_code ON urls(short_code);
-CREATE INDEX idx_user_id    ON urls(user_id);

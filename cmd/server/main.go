@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 	"github.com/samsunil1999/url-shortener/internal/handler"
 	"github.com/samsunil1999/url-shortener/internal/middleware"
 	"github.com/samsunil1999/url-shortener/internal/repository"
@@ -22,10 +23,19 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
+	if err := godotenv.Load(".env"); err != nil {
+		slog.Info(".env file not found, using environment variables", "error", err.Error())
+	}
 	// Init DB
-	db, err := database.NewPostgres(os.Getenv("DATABASE_URL"))
+	dsn := "postgres://" + os.Getenv("DATABASE_USER") +
+		":" + os.Getenv("DATABASE_PASSWORD") + "@" +
+		os.Getenv("DATABASE_HOST") + ":" + os.Getenv("DATABASE_PORT") + "/" +
+		os.Getenv("DATABASE_NAME") + "?sslmode=disable"
+
+	db, err := database.NewPostgres(dsn, os.Getenv("DATABASE_NAME"))
 	if err != nil {
 		slog.Error("failed to connect to database", "error", err)
+		slog.Info("printing the dsn", "DSN", dsn)
 		os.Exit(1)
 	}
 	defer db.Close()

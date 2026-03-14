@@ -5,11 +5,16 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/golang-migrate/migrate"
+	"github.com/golang-migrate/migrate/database/postgres"
+	_ "github.com/golang-migrate/migrate/source/file"
+
 	_ "github.com/lib/pq"
 )
 
-func NewPostgres(dsn string) (*sql.DB, error) {
+func NewPostgres(dsn, dbname string) (*sql.DB, error) {
 	db, err := sql.Open("postgres", dsn)
+
 	if err != nil {
 		return nil, fmt.Errorf("open postgres: %w", err)
 	}
@@ -21,5 +26,25 @@ func NewPostgres(dsn string) (*sql.DB, error) {
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("ping postgres: %w", err)
 	}
+
+	driver, err := postgres.WithInstance(db, &postgres.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("driver postgres: %w", err)
+	}
+
+	migration, err := migrate.NewWithDatabaseInstance(
+		"file://migrations",
+		dbname, driver,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("migrate instance postgres: %w", err)
+	}
+
+	// migrate to the latest version
+	err = migration.Up()
+	if err != nil && err != migrate.ErrNoChange {
+		return nil, fmt.Errorf("migration postgres: %w", err)
+	}
+
 	return db, nil
 }
