@@ -14,8 +14,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
       
-  app:
+  app-1:
     build: .
     ports:
       - "8080:8080"
@@ -32,11 +37,24 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-
-  redis:
-    image: redis:7-alpine
+    
+  app-2:
+    build: .
     ports:
-      - "6379:6379"
+      - "8081:8081"
+    env_file: .env
+    environment:
+      - DATABASE_HOST=db
+      - DATABASE_PORT=5432
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=admin
+      - DATABASE_NAME=urlshortener
+      - REDIS_URL=redis:6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
 volumes:
   pgdata:
