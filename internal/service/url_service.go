@@ -4,15 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
-	"regexp"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/samsunil1999/url-shortener/internal/repository"
-	"github.com/samsunil1999/url-shortener/pkg/shortener"
 )
 
 var (
@@ -21,15 +18,8 @@ var (
 	ErrAliasInvalid  = errors.New("alias must be 3-30 alphanumeric characters")
 )
 
-var reservedWords = map[string]bool{
-	"api": true, "admin": true, "health": true, "static": true, "login": true,
-}
-var aliasRegex = regexp.MustCompile(`^[a-zA-Z0-9-]{3,30}$`)
-
 type ShortenRequest struct {
-	OriginalURL string     `json:"original_url" binding:"required,url"`
-	CustomAlias string     `json:"custom_alias"`
-	ExpiresAt   *time.Time `json:"expires_at"`
+	OriginalURL string `json:"original_url" binding:"required,url"`
 }
 
 type StatsResponse struct {
@@ -54,36 +44,36 @@ type urlService struct {
 	logger    *slog.Logger
 }
 
-func NewURLService(repo repository.URLRepository, analytics repository.AnalyticsRepository, rdb *redis.Client, logger *slog.Logger) URLService {
-	return &urlService{repo: repo, analytics: analytics, redis: rdb, logger: logger}
+func NewURLService(repo repository.URLRepository, analytics repository.AnalyticsRepository, redis *redis.Client, logger *slog.Logger) URLService {
+	return &urlService{repo: repo, analytics: analytics, redis: redis, logger: logger}
 }
 
 func (s *urlService) Shorten(ctx context.Context, req *ShortenRequest) (*repository.URL, error) {
 	url := &repository.URL{
 		OriginalURL: req.OriginalURL,
-		ExpiresAt:   req.ExpiresAt,
 	}
 
-	if req.CustomAlias != "" {
-		if err := s.validateAlias(ctx, req.CustomAlias); err != nil {
-			return nil, err
-		}
-		url.ShortCode = req.CustomAlias
-		url.CustomAlias = req.CustomAlias
-	}
+	// if req.CustomAlias != "" {
+	// 	if err := s.validateAlias(req.CustomAlias); err != nil {
+	// 		return nil, err
+	// 	}
+	// 	url.ShortCode = req.CustomAlias
+	// 	url.CustomAlias = req.CustomAlias
+	// }
 
 	if err := s.repo.Create(ctx, url); err != nil {
+		s.logger.Error("failed to create URL", "error", err, "original_url", req.OriginalURL)
 		return nil, err
 	}
 
 	// If no custom alias, encode the DB ID to base62
-	if req.CustomAlias == "" {
-		url.ShortCode = shortener.Encode(uint64(url.ID))
-		// Update the short_code in DB
-		if err := s.repo.UpdateShortCode(ctx, url.ID, url.ShortCode); err != nil {
-			return nil, err
-		}
-	}
+	// if req.CustomAlias == "" {
+	// 	url.ShortCode = shortener.Encode(uint64(url.ID))
+	// 	// Update the short_code in DB
+	// 	if err := s.repo.UpdateShortCode(ctx, url.ID, url.ShortCode); err != nil {
+	// 		return nil, err
+	// 	}
+	// }
 
 	return url, nil
 }
@@ -166,14 +156,4 @@ func (s *urlService) StartExpirationWorker(ctx context.Context) {
 			}
 		}
 	}()
-}
-
-func (s *urlService) validateAlias(ctx context.Context, alias string) error {
-	if !aliasRegex.MatchString(alias) {
-		return ErrAliasInvalid
-	}
-	if reservedWords[alias] {
-		return fmt.Errorf("'%s' is a reserved word", alias)
-	}
-	return nil
 }

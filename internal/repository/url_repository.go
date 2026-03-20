@@ -12,7 +12,6 @@ type URL struct {
 	ID          int64
 	ShortCode   string
 	OriginalURL string
-	CustomAlias string
 	ExpiresAt   *time.Time
 	CreatedAt   time.Time
 }
@@ -35,11 +34,11 @@ func NewURLRepository(db *sql.DB) URLRepository {
 
 func (r *urlRepository) Create(ctx context.Context, url *URL) error {
 	query := `
-        INSERT INTO urls (short_code, original_url, custom_alias, expires_at)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO urls (short_code, original_url, expires_at)
+        VALUES ($1, $2, $3)
         RETURNING id, created_at`
 	return r.db.QueryRowContext(ctx, query,
-		url.ShortCode, url.OriginalURL, url.CustomAlias, url.ExpiresAt,
+		url.ShortCode, url.OriginalURL, url.ExpiresAt,
 	).Scan(&url.ID, &url.CreatedAt)
 }
 
