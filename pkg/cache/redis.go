@@ -7,11 +7,23 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func NewRedis(addr string) (*redis.Client, error) {
+type RedisStore struct {
+	Client *redis.Client
+}
+
+func NewRedisStore(addr string) (*RedisStore, error) {
 	rdb := redis.NewClient(&redis.Options{Addr: addr})
 
 	if err := rdb.Ping(context.Background()).Err(); err != nil {
 		return nil, fmt.Errorf("ping redis: %w", err)
 	}
-	return rdb, nil
+	return &RedisStore{Client: rdb}, nil
+}
+
+func (r *RedisStore) ReserveBatch(ctx context.Context, key string, batchSize int64) (int64, error) {
+	return r.Client.IncrBy(ctx, key, batchSize).Result()
+}
+
+func (r *RedisStore) Close() error {
+	return r.Client.Close()
 }

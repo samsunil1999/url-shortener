@@ -24,8 +24,10 @@ func main() {
 	slog.SetDefault(logger)
 
 	if err := godotenv.Load(".env"); err != nil {
-		slog.Info(".env file not found, using environment variables", "error", err.Error())
+		slog.Error(".env file not found", "error", err.Error())
+		os.Exit(1)
 	}
+
 	// Init DB
 	dsn := "postgres://" + os.Getenv("DATABASE_USER") +
 		":" + os.Getenv("DATABASE_PASSWORD") + "@" +
@@ -34,24 +36,23 @@ func main() {
 
 	db, err := database.NewPostgres(dsn, os.Getenv("DATABASE_NAME"))
 	if err != nil {
-		slog.Error("failed to connect to database", "error", err)
-		slog.Info("printing the dsn", "DSN", dsn)
+		slog.Error("failed to connect to database", "error", err, "dsn", dsn)
 		os.Exit(1)
 	}
 	defer db.Close()
 
 	// Init Redis
-	rdb, err := cache.NewRedis(os.Getenv("REDIS_URL"))
+	redis, err := cache.NewRedisStore(os.Getenv("REDIS_URL"))
 	if err != nil {
 		slog.Error("failed to connect to redis", "error", err)
 		os.Exit(1)
 	}
-	defer rdb.Close()
+	defer redis.Close()
 
 	// Wire up layers
 	repo := repository.NewURLRepository(db)
 	analyticRepo := repository.NewAnalyticsRepository(db)
-	svc := service.NewURLService(repo, analyticRepo, rdb, logger)
+	svc := service.NewURLService(repo, analyticRepo, redis.Client, logger)
 	h := handler.NewHandler(svc, logger)
 
 	// Start expiration worker
@@ -63,7 +64,7 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.Logger(logger))
-	r.Use(middleware.RateLimit(rdb))
+	r.Use(middleware.RateLimit(redis.Client))
 
 	// Routes
 	r.GET("/health", h.Health)
